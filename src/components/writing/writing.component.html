@@ -1,0 +1,123 @@
+
+<div class="flex flex-col h-[calc(100vh-180px)] max-w-6xl mx-auto">
+  @switch (writingService.state()) {
+    @case ('idle') {
+      <div 
+        (click)="triggerFileInput()"
+        (dragover)="onDragOver($event)"
+        (dragleave)="onDragLeave($event)"
+        (drop)="onDrop($event)"
+        class="flex flex-col items-center justify-center h-full p-8 text-center bg-white/60 dark:bg-slate-800/60 backdrop-blur-xl rounded-2xl shadow-2xl shadow-blue-100/50 dark:shadow-slate-950/50 border-2 border-dashed transition-colors duration-300 cursor-pointer"
+        [class.border-blue-500]="isDragging()"
+        [class.bg-blue-50]="isDragging()"
+        [class.dark:bg-slate-800]="isDragging()"
+        [class.border-slate-300]="!isDragging()"
+        [class.dark:border-slate-600]="!isDragging()"
+        [class.hover:border-blue-400]="!isDragging()"
+        [class.dark:hover:border-blue-500]="!isDragging()">
+        
+        <input type="file" #fileInput class="hidden" (change)="onFileSelected($event)" accept="image/*">
+        <div class="relative w-40 h-40 flex items-center justify-center mb-6">
+          <div class="absolute inset-0 bg-gradient-to-br from-purple-400 to-pink-500 rounded-full opacity-20 blur-2xl"></div>
+          <div class="w-32 h-32 bg-white dark:bg-slate-700 rounded-full shadow-lg flex items-center justify-center">
+             <i class="fas fa-camera-retro text-6xl text-transparent bg-clip-text bg-gradient-to-br from-purple-500 to-pink-600"></i>
+          </div>
+        </div>
+        <h2 class="text-4xl font-extrabold mb-2 text-slate-900 dark:text-white">Practice Your Writing</h2>
+        <p class="text-slate-600 dark:text-slate-300 mb-2 max-w-md">
+          Take a photo of your handwritten German notes and get instant feedback from Herr Schmidt.
+        </p>
+         <p class="font-semibold text-slate-700 dark:text-slate-200">Click here or drag & drop an image to start.</p>
+      </div>
+    }
+    @case ('image_selected') {
+        <div class="flex flex-col items-center justify-center h-full p-8 text-center bg-white/60 dark:bg-slate-800/60 backdrop-blur-xl rounded-2xl shadow-2xl">
+            <h2 class="text-3xl font-bold mb-4">Image Ready for Analysis</h2>
+            <img [src]="writingService.selectedImage()" alt="Selected handwriting" class="max-h-[50vh] max-w-full rounded-lg shadow-lg mb-6 border-4 border-white dark:border-slate-700">
+            <div class="flex space-x-4">
+                <button (click)="startOver()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold py-3 px-8 rounded-full text-lg transition-transform transform hover:scale-105">
+                    <i class="fas fa-times mr-2"></i>
+                    Cancel
+                </button>
+                <button (click)="analyze()" class="bg-gradient-to-br from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white font-bold py-3 px-8 rounded-full text-lg transition-transform transform hover:scale-105 shadow-lg">
+                    <i class="fas fa-magic mr-2"></i>
+                    Analyze Writing
+                </button>
+            </div>
+             @if (geminiService.error()) {
+              <p class="text-red-500 text-sm mt-4 text-center">{{ geminiService.error() }}</p>
+            }
+        </div>
+    }
+    @case ('analyzing') {
+      <div class="flex flex-col items-center justify-center h-full p-8 text-center bg-white/60 dark:bg-slate-800/60 backdrop-blur-xl rounded-2xl shadow-2xl">
+        <div class="animate-spin text-6xl text-blue-500 mb-6"><i class="fas fa-spinner"></i></div>
+        <h2 class="text-3xl font-bold mb-2">Analyzing Your Writing...</h2>
+        <p class="text-slate-600 dark:text-slate-300 max-w-md">Herr Schmidt is carefully reviewing your work. This may take a moment.</p>
+      </div>
+    }
+    @case ('report_ready') {
+      @if (writingService.latestReport(); as report) {
+        <div class.="p-6 bg-white/60 dark:bg-slate-800/60 backdrop-blur-xl rounded-2xl shadow-2xl overflow-y-auto">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-3xl font-bold">Writing Feedback</h2>
+                <button (click)="startOver()" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-6 rounded-full transition-transform transform hover:scale-105">
+                    <i class="fas fa-plus mr-2"></i>
+                    Analyze New Writing
+                </button>
+            </div>
+            <div class="grid lg:grid-cols-2 gap-6">
+                <!-- Original Image -->
+                <div class="space-y-3">
+                    <h3 class="font-bold text-xl">Your Submission</h3>
+                    <img [src]="report.imageUrl" alt="Your handwriting" class="rounded-lg shadow-md border border-slate-200 dark:border-slate-700 w-full">
+                </div>
+                <!-- Analysis -->
+                <div class="space-y-4">
+                  <div class="border-l-4 border-slate-400 bg-slate-50 dark:bg-slate-900/40 p-4 rounded-r-lg">
+                    <h4 class="font-bold text-lg mb-2 flex items-center text-slate-800 dark:text-slate-200"><i class="fas fa-comment-dots text-slate-500 mr-3"></i>Overall Feedback</h4>
+                    <p class="text-slate-600 dark:text-slate-300">{{ report.overallFeedback }}</p>
+                  </div>
+                  <div class="border-l-4 border-green-500 bg-green-50 dark:bg-green-900/20 p-4 rounded-r-lg">
+                    <h4 class="font-bold text-lg mb-2 flex items-center text-green-800 dark:text-green-300"><i class="fas fa-thumbs-up mr-3"></i>What Went Well</h4>
+                    <ul class="list-disc list-inside space-y-2 pl-2 text-slate-700 dark:text-slate-300">
+                      @for(point of report.positivePoints; track $index) { <li>{{ point }}</li> }
+                    </ul>
+                  </div>
+                </div>
+            </div>
+             <!-- Corrections Table -->
+            <div class="mt-6">
+                <h3 class="font-bold text-xl mb-3">Corrections & Suggestions</h3>
+                <div class="flow-root">
+                    <div class="-mx-4 -my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
+                        <div class="inline-block min-w-full py-2 align-middle sm:px-6 lg:px-8">
+                            <div class="overflow-hidden shadow ring-1 ring-black ring-opacity-5 sm:rounded-lg">
+                                <table class="min-w-full divide-y divide-slate-300 dark:divide-slate-600">
+                                    <thead class="bg-slate-50 dark:bg-slate-700">
+                                        <tr>
+                                            <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-slate-900 dark:text-white sm:pl-6">Your Text</th>
+                                            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-slate-900 dark:text-white">Correction</th>
+                                            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-slate-900 dark:text-white">Explanation</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-slate-200 dark:divide-slate-700 bg-white dark:bg-slate-800">
+                                        @for (correction of report.corrections; track $index) {
+                                        <tr>
+                                            <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm text-slate-500 dark:text-slate-400 sm:pl-6"><s class="text-red-500">{{ correction.original }}</s></td>
+                                            <td class="whitespace-nowrap px-3 py-4 text-sm font-medium text-green-600">{{ correction.corrected }}</td>
+                                            <td class="whitespace-normal px-3 py-4 text-sm text-slate-500 dark:text-slate-300">{{ correction.explanation }}</td>
+                                        </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+      }
+    }
+  }
+</div>

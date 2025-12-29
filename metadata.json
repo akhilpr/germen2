@@ -1,0 +1,7 @@
+{
+  "name": "German Language Coach",
+  "description": "An interactive AI-powered application to help users practice and improve their German language skills through real-time conversations and progress tracking.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
