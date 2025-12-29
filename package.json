@@ -21,9 +21,10 @@
     "@angular/compiler-cli": "^21.0.0",
     "tailwindcss": "latest"
   },
-  "devDependencies": {
-    "@types/node": "^22.14.0",
-     "typescript": "~5.9.2",
-    "vite": "^6.2.0"
-  }
+ "devDependencies": {
+  "@types/node": "^22.14.0",
+  "typescript": "5.9.2",
+  "vite": "^6.2.0"
+}
+
 }
