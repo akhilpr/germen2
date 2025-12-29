@@ -11,6 +11,40 @@ export class GeminiService {
   
   error = signal<string | null>(null);
 
+  // --- Production-Ready Prompts ---
+  private readonly SYSTEM_INSTRUCTION_CHAT = `You are Herr Schmidt, a friendly, patient, and encouraging German language teacher. 
+        Converse with the user in German to help them practice for an exam. 
+        Keep your responses relatively short and clear, suitable for a language learner. 
+        Your goal is to maintain a natural conversation. 
+        Do not explicitly correct every mistake, but you can subtly model the correct grammar or vocabulary in your responses.`;
+
+  private readonly CONVERSATION_ANALYSIS_PROMPT_TEMPLATE = `You are a German language teaching expert. Analyze the following conversation transcript between a student (user) and a teacher (model). Provide a detailed analysis based on the student's performance.
+
+Transcript:
+---
+\${transcriptString}
+---
+
+Your task is to evaluate the student's German skills and provide a report in a strict JSON format.
+
+1.  **overallFeedback**: Write a brief, encouraging paragraph summarizing the student's performance. Mention their strengths and the general impression.
+2.  **scores (0-100)**:
+    *   **grammarScore**: Rate the student's grammatical accuracy. Consider sentence structure, verb conjugations, noun cases (nominative, accusative, dative), and prepositions.
+    *   **vocabularyScore**: Rate the student's use of vocabulary. Consider the range of words, appropriateness of word choice, and avoidance of repetition.
+    *   **fluencyScore**: Rate the student's conversational fluency. Consider the flow of the conversation, hesitation, and the ability to express ideas smoothly.
+3.  **positivePoints**: List 2-3 specific things the student did well. Be specific, e.g., "Correctly used the dative case in 'Ich gebe dem Mann ein Buch'."
+4.  **areasForImprovement**: List 2-3 specific, actionable areas for improvement. Provide examples from the transcript, e.g., "The verb should be in the second position in main clauses. Instead of 'Heute ich gehe...', it should be 'Heute gehe ich...'."
+
+Ensure your entire output is only the JSON object, with no surrounding text or markdown.`;
+
+  private readonly HANDWRITING_ANALYSIS_PROMPT = `You are a helpful and encouraging German language teacher. Analyze the handwritten German text in the provided image.
+      - Identify any mistakes in grammar, spelling, or vocabulary.
+      - Provide a brief, encouraging summary of the user's performance.
+      - Create a list of specific corrections. For each correction, provide the original text snippet, the corrected version, and a simple explanation.
+      - Create a list of 2-3 things the user did well (e.g., good vocabulary usage, correct sentence structure).
+      - Structure your response strictly as JSON.`;
+
+
   constructor() {
     if (!process.env.API_KEY) {
         const errorMessage = "API_KEY environment variable not set. The application cannot contact the Gemini API.";
@@ -30,11 +64,7 @@ export class GeminiService {
     this.chat = this.ai.chats.create({
       model: 'gemini-2.5-flash',
       config: {
-        systemInstruction: `You are Herr Schmidt, a friendly, patient, and encouraging German language teacher. 
-        Converse with the user in German to help them practice for an exam. 
-        Keep your responses relatively short and clear, suitable for a language learner. 
-        Your goal is to maintain a natural conversation. 
-        Do not explicitly correct every mistake, but you can subtly model the correct grammar or vocabulary in your responses.`,
+        systemInstruction: this.SYSTEM_INSTRUCTION_CHAT,
       },
     });
     this.error.set(null);
@@ -69,10 +99,30 @@ export class GeminiService {
         this.error.set("Gemini AI client is not initialized. Please check your API key.");
         return null;
     }
-    const prompt = `Analyze the following German conversation transcript...`; // Prompt omitted for brevity
+    const transcriptString = transcript.map(m => `${m.role}: ${m.text}`).join('\n');
+    const prompt = this.CONVERSATION_ANALYSIS_PROMPT_TEMPLATE.replace('${transcriptString}', transcriptString);
+    
     this.error.set(null);
     try {
-      const response = await this.ai.models.generateContent({ /* ... */ }); // Body omitted for brevity
+      const response = await this.ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: prompt,
+        config: {
+          responseMimeType: 'application/json',
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              overallFeedback: { type: Type.STRING },
+              grammarScore: { type: Type.NUMBER },
+              vocabularyScore: { type: Type.NUMBER },
+              fluencyScore: { type: Type.NUMBER },
+              positivePoints: { type: Type.ARRAY, items: { type: Type.STRING } },
+              areasForImprovement: { type: Type.ARRAY, items: { type: Type.STRING } }
+            },
+            required: ['overallFeedback', 'grammarScore', 'vocabularyScore', 'fluencyScore', 'positivePoints', 'areasForImprovement']
+          }
+        }
+      });
       return JSON.parse(response.text.trim()) as Partial<ConversationReport>;
     } catch (e) {
       console.error('Error analyzing conversation:', e);
@@ -96,20 +146,9 @@ export class GeminiService {
     const mimeType = match[1];
     const base64Data = match[2];
 
-    const textPart = {
-      text: `You are a helpful and encouraging German language teacher. Analyze the handwritten German text in the provided image.
-      - Identify any mistakes in grammar, spelling, or vocabulary.
-      - Provide a brief, encouraging summary of the user's performance.
-      - Create a list of specific corrections. For each correction, provide the original text snippet, the corrected version, and a simple explanation.
-      - Create a list of 2-3 things the user did well (e.g., good vocabulary usage, correct sentence structure).
-      - Structure your response strictly as JSON.`
-    };
-
+    const textPart = { text: this.HANDWRITING_ANALYSIS_PROMPT };
     const imagePart = {
-      inlineData: {
-        mimeType: mimeType,
-        data: base64Data
-      }
+      inlineData: { mimeType: mimeType, data: base64Data }
     };
 
     this.error.set(null);

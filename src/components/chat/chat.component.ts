@@ -86,27 +86,19 @@ export class ChatComponent implements OnDestroy {
 
   private async processUserMessage(message: string): Promise<void> {
     this.isProcessing.set(true);
-    this.conversationService.addUserMessage(message);
     
-    // The addUserMessage method streams the response into the service's signal.
-    // Here, we wait for the full response to be collected before speaking.
-    let fullResponse = '';
-    await this.geminiService.sendMessageStream(
-        message,
-        (chunk) => {
-          fullResponse += chunk;
-        },
-        async () => { // onComplete
-          this.isProcessing.set(false);
-          if (fullResponse && this.conversationService.isConversationActive()) {
-            try {
-              await this.speechService.speak(fullResponse, 'de-DE');
-            } catch(e) {
-              console.error("Error speaking AI response:", e);
-            }
-          }
-        }
-    );
+    // The service now handles streaming to the UI and returns the full response.
+    const fullResponse = await this.conversationService.addUserMessage(message);
+
+    this.isProcessing.set(false);
+
+    if (fullResponse && this.conversationService.isConversationActive()) {
+      try {
+        await this.speechService.speak(fullResponse, 'de-DE');
+      } catch (e) {
+        console.error("Error speaking AI response:", e);
+      }
+    }
   }
 
   stopConversation(): void {

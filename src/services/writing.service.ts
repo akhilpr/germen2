@@ -5,6 +5,9 @@ import { GeminiService } from './gemini.service';
 
 type WritingState = 'idle' | 'image_selected' | 'analyzing' | 'report_ready';
 
+const MAX_FILE_SIZE_MB = 5;
+const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
+
 @Injectable({ providedIn: 'root' })
 export class WritingService {
   private geminiService = inject(GeminiService);
@@ -16,18 +19,28 @@ export class WritingService {
   readonly latestReport = signal<WritingReport | null>(null);
 
   constructor() {
-    const savedReports = localStorage.getItem('german-coach-writing-reports');
-    if (savedReports) {
-      const parsedReports = JSON.parse(savedReports).map((r: any) => ({...r, date: new Date(r.date)}));
-      this.reports.set(parsedReports);
+    try {
+      const savedReports = localStorage.getItem('german-coach-writing-reports');
+      if (savedReports) {
+        const parsedReports = JSON.parse(savedReports).map((r: any) => ({...r, date: new Date(r.date)}));
+        this.reports.set(parsedReports);
+      }
+    } catch (e) {
+      console.error("Failed to load writing reports from localStorage", e);
     }
   }
   
   selectImage(file: File): void {
+    if (file.size > MAX_FILE_SIZE_BYTES) {
+      this.geminiService.error.set(`Image size exceeds ${MAX_FILE_SIZE_MB}MB. Please choose a smaller file.`);
+      return;
+    }
+    
     const reader = new FileReader();
     reader.onload = (e) => {
       this.selectedImage.set(reader.result as string);
       this.state.set('image_selected');
+      this.geminiService.error.set(null); // Clear previous errors
     };
     reader.onerror = (e) => {
       console.error("FileReader error:", e);
@@ -70,6 +83,10 @@ export class WritingService {
   }
 
   private saveReportsToLocalStorage(): void {
-    localStorage.setItem('german-coach-writing-reports', JSON.stringify(this.reports()));
+    try {
+      localStorage.setItem('german-coach-writing-reports', JSON.stringify(this.reports()));
+    } catch (e) {
+      console.error("Failed to save writing reports to localStorage", e);
+    }
   }
 }

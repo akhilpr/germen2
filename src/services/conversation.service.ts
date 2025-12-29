@@ -35,11 +35,15 @@ export class ConversationService {
   });
 
   constructor() {
-    // Load reports from localStorage for persistence (simple implementation)
-    const savedReports = localStorage.getItem('german-coach-reports');
-    if (savedReports) {
-      const parsedReports = JSON.parse(savedReports).map((r: any) => ({...r, date: new Date(r.date)}));
-      this.reports.set(parsedReports);
+    // Load reports from localStorage with robust error handling
+    try {
+      const savedReports = localStorage.getItem('german-coach-reports');
+      if (savedReports) {
+        const parsedReports = JSON.parse(savedReports).map((r: any) => ({...r, date: new Date(r.date)}));
+        this.reports.set(parsedReports);
+      }
+    } catch (e) {
+      console.error("Failed to load conversation reports from localStorage", e);
     }
   }
 
@@ -53,8 +57,8 @@ export class ConversationService {
     this.latestReport.set(null);
   }
 
-  async addUserMessage(message: string): Promise<void> {
-    if (!this.isConversationActive()) return;
+  async addUserMessage(message: string): Promise<string> {
+    if (!this.isConversationActive()) return '';
 
     this.activeConversation.update(conv => [...conv, { role: 'user', text: message }]);
     
@@ -67,11 +71,15 @@ export class ConversationService {
         fullResponse += chunk;
         this.activeConversation.update(conv => {
             const lastMessage = conv[conv.length-1];
-            lastMessage.text = fullResponse;
+            if (lastMessage) {
+              lastMessage.text = fullResponse;
+            }
             return [...conv];
         });
     },
     () => { /* onComplete */ });
+    
+    return fullResponse;
   }
 
   async stopConversation(): Promise<void> {
@@ -101,6 +109,10 @@ export class ConversationService {
   }
 
   private saveReportsToLocalStorage(): void {
-    localStorage.setItem('german-coach-reports', JSON.stringify(this.reports()));
+    try {
+      localStorage.setItem('german-coach-reports', JSON.stringify(this.reports()));
+    } catch (e) {
+      console.error("Failed to save conversation reports to localStorage", e);
+    }
   }
 }
